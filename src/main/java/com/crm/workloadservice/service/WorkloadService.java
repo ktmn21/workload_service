@@ -2,6 +2,7 @@ package com.crm.workloadservice.service;
 
 import com.crm.workloadservice.dao.TrainerSummaryRepository;
 import com.crm.workloadservice.dto.ActionType;
+import com.crm.workloadservice.dto.TrainerSummaryResponse;
 import com.crm.workloadservice.dto.TrainerWorkloadRequest;
 import com.crm.workloadservice.model.TrainerSummary;
 import com.crm.workloadservice.model.TrainingMonth;
@@ -10,6 +11,8 @@ import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -23,6 +26,24 @@ public class WorkloadService {
             case ADD -> handleAdd(request);
             case DELETE -> handleDelete(request);
         }
+    }
+
+    @Transactional(readOnly = true)
+    public TrainerSummaryResponse getSummary(String username) {
+        TrainerSummary trainer = trainerSummaryRepository.findByUsername(username)
+                .orElseThrow(() -> new EntityNotFoundException("Trainer not found: " + username));
+
+        List<TrainerSummaryResponse.YearSummary> years = trainer.getYearList().stream()
+                .map(y -> new TrainerSummaryResponse.YearSummary(
+                        y.getYear(),
+                        y.getMonthList().stream()
+                                .map(m -> new TrainerSummaryResponse.MonthSummary(m.getMonth(), m.getDuration()))
+                                .toList()))
+                .toList();
+
+        return new TrainerSummaryResponse(
+                trainer.getUsername(), trainer.getFirstName(),
+                trainer.getLastName(), trainer.getStatus(), years);
     }
 
     private void handleAdd(TrainerWorkloadRequest request) {

@@ -17,6 +17,7 @@ public class TrainingMonth {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Column(name = "month_number")
     private Integer month;
     private Integer duration;
 

@@ -20,6 +20,7 @@ public class TrainingYear {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Column(name = "year_number")
     private Integer year;
 
     @ManyToOne
