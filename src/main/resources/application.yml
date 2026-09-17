@@ -16,6 +16,19 @@ spring:
     console:
       enabled: true
 
+  activemq:
+    broker-url: tcp://localhost:61616
+    user: admin
+    password: admin
+  jms:
+    pub-sub-domain: false
+
+workload:
+  queue:
+    name: workload.queue
+    dlq-name: workload.dlq
+    max-redeliveries: 3
+
 jwt:
   secret: ${JWT_SECRET:404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}
 
@@ -23,7 +36,3 @@ jwt:
 server:
   port: 8081
 
-eureka:
-  client:
-    service-url:
-      defaultZone: http://localhost:8761/eureka/
