@@ -22,8 +22,8 @@ services:
     container_name: workload-activemq
     restart: unless-stopped
     ports:
-      - "61616:61616"   # OpenWire/JMS port used by spring.activemq.broker-url
-      - "8161:8161"     # web console
+      - "61616:61616"
+      - "8161:8161"
     environment:
       ARTEMIS_USER: admin
       ARTEMIS_PASSWORD: admin
