@@ -1,28 +1,25 @@
 package com.crm.workloadservice.model;
 
-import jakarta.persistence.*;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
-@Entity
-@Setter
 @Getter
+@Setter
 @NoArgsConstructor
 @AllArgsConstructor
 public class TrainingMonth {
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
-
-    @Column(name = "month_number")
+    @NotNull
+    @Min(1)
+    @Max(12)
     private Integer month;
-    private Integer duration;
 
-    @ManyToOne
-    @JoinColumn(name = "year_id")
-    private TrainingYear trainingYear;
-
+    @NotNull
+    @Min(0)
+    private Integer trainingsSummaryDuration;
 }
