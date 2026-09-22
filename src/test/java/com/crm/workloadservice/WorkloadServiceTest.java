@@ -2,199 +2,170 @@ package com.crm.workloadservice;
 
 import com.crm.workloadservice.dao.TrainerSummaryRepository;
 import com.crm.workloadservice.dto.ActionType;
+import com.crm.workloadservice.dto.TrainerSummaryResponse;
 import com.crm.workloadservice.dto.TrainerWorkloadRequest;
+import com.crm.workloadservice.exception.TrainerNotFoundException;
 import com.crm.workloadservice.model.TrainerSummary;
 import com.crm.workloadservice.model.TrainingMonth;
 import com.crm.workloadservice.model.TrainingYear;
 import com.crm.workloadservice.service.WorkloadService;
-import jakarta.persistence.EntityNotFoundException;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.never;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class WorkloadServiceTest {
 
     @Mock
-    TrainerSummaryRepository trainerSummaryRepository;
+    private TrainerSummaryRepository trainerSummaryRepository;
 
-    @InjectMocks
-    WorkloadService service;
+    private WorkloadService workloadService;
 
-    private static final String USERNAME = "jane.smith";
-    private static final LocalDate TRAINING_DATE = LocalDate.of(2026, 5, 15);
+    @BeforeEach
+    void setUp() {
+        workloadService = new WorkloadService(trainerSummaryRepository);
+    }
 
-    private TrainerWorkloadRequest buildRequest(int duration, ActionType actionType) {
+    private TrainerWorkloadRequest buildRequest(ActionType actionType, int duration, LocalDate date) {
         return new TrainerWorkloadRequest(
-                USERNAME,
-                "Jane",
-                "Smith",
-                true,
-                TRAINING_DATE,
-                duration,
-                actionType
-        );
-    }
-
-    private TrainerSummary trainerWithMonth(int year, int month, int duration) {
-        TrainerSummary trainer = new TrainerSummary();
-        trainer.setUsername(USERNAME);
-        trainer.setFirstName("Jane");
-        trainer.setLastName("Smith");
-        trainer.setStatus(true);
-
-        TrainingYear trainingYear = new TrainingYear();
-        trainingYear.setYear(year);
-        trainer.addYear(trainingYear);
-
-        TrainingMonth trainingMonth = new TrainingMonth();
-        trainingMonth.setMonth(month);
-        trainingMonth.setDuration(duration);
-        trainingYear.addMonth(trainingMonth);
-
-        return trainer;
+                "john.doe", "John", "Doe", true, date, duration, actionType);
     }
 
     @Test
-    void handleAdd_newTrainer_createsWithDuration() {
-        when(trainerSummaryRepository.findByUsername(USERNAME)).thenReturn(Optional.empty());
+    void process_add_newTrainer_createsDocumentWithInitialDuration() {
+        when(trainerSummaryRepository.searchByUsername("john.doe")).thenReturn(Optional.empty());
 
-        TrainerWorkloadRequest request = buildRequest(10, ActionType.ADD);
-        service.process(request);
+        workloadService.process(buildRequest(ActionType.ADD, 60, LocalDate.of(2026, 3, 10)));
 
         ArgumentCaptor<TrainerSummary> captor = ArgumentCaptor.forClass(TrainerSummary.class);
         verify(trainerSummaryRepository).save(captor.capture());
-
         TrainerSummary saved = captor.getValue();
-        assertEquals(USERNAME, saved.getUsername());
-        assertEquals("Jane", saved.getFirstName());
-        assertEquals("Smith", saved.getLastName());
-        assertEquals(true, saved.getStatus());
-        assertThat(saved.getYearList()).hasSize(1);
 
-        TrainingYear year = saved.getYearList().get(0);
-        assertEquals(2026, year.getYear());
-        assertThat(year.getMonthList()).hasSize(1);
-
-        TrainingMonth month = year.getMonthList().get(0);
-        assertEquals(5, month.getMonth());
-        assertEquals(10, month.getDuration());
+        assertThat(saved.getUsername()).isEqualTo("john.doe");
+        assertThat(saved.getStatus()).isTrue();
+        assertThat(saved.getYears()).hasSize(1);
+        assertThat(saved.getYears().get(0).getYear()).isEqualTo(2026);
+        assertThat(saved.getYears().get(0).getMonths().get(0).getMonth()).isEqualTo(3);
+        assertThat(saved.getYears().get(0).getMonths().get(0).getTrainingsSummaryDuration()).isEqualTo(60);
     }
 
     @Test
-    void handleAdd_existingMonth_accumulatesDuration() {
-        TrainerSummary existing = trainerWithMonth(2026, 5, 8);
-        when(trainerSummaryRepository.findByUsername(USERNAME)).thenReturn(Optional.of(existing));
-
-        TrainerWorkloadRequest request = buildRequest(10, ActionType.ADD);
-        service.process(request);
-
-        ArgumentCaptor<TrainerSummary> captor = ArgumentCaptor.forClass(TrainerSummary.class);
-        verify(trainerSummaryRepository).save(captor.capture());
-
-        TrainingMonth updatedMonth = captor.getValue().getYearList().get(0).getMonthList().get(0);
-        assertEquals(18, updatedMonth.getDuration());
-        // no duplicate month/year rows created
-        assertThat(captor.getValue().getYearList()).hasSize(1);
-        assertThat(captor.getValue().getYearList().get(0).getMonthList()).hasSize(1);
-    }
-
-    @Test
-    void handleAdd_existingTrainerNewMonth_addsSeparateMonthEntry() {
-        TrainerSummary existing = trainerWithMonth(2026, 4, 6);
-        when(trainerSummaryRepository.findByUsername(USERNAME)).thenReturn(Optional.of(existing));
-
-        TrainerWorkloadRequest request = buildRequest(10, ActionType.ADD);
-        service.process(request);
-
-        ArgumentCaptor<TrainerSummary> captor = ArgumentCaptor.forClass(TrainerSummary.class);
-        verify(trainerSummaryRepository).save(captor.capture());
-
-        TrainingYear year = captor.getValue().getYearList().get(0);
-        assertThat(year.getMonthList()).hasSize(2);
-        assertThat(year.getMonthList())
-                .anySatisfy(m -> assertEquals(6, m.getDuration()))
-                .anySatisfy(m -> assertEquals(10, m.getDuration()));
-    }
-
-    @Test
-    void handleDelete_unknownTrainer_throwsNotFound() {
-        when(trainerSummaryRepository.findByUsername(USERNAME)).thenReturn(Optional.empty());
-
-        TrainerWorkloadRequest request = buildRequest(5, ActionType.DELETE);
-
-        assertThrows(EntityNotFoundException.class, () -> service.process(request));
-        verify(trainerSummaryRepository, never()).save(any());
-    }
-
-    @Test
-    void handleDelete_noMatchingMonth_throwsNotFound() {
+    void process_add_existingTrainerExistingMonth_addsDurationToExistingValue() {
         TrainerSummary existing = new TrainerSummary();
-        existing.setUsername(USERNAME);
-        when(trainerSummaryRepository.findByUsername(USERNAME)).thenReturn(Optional.of(existing));
+        existing.setUsername("john.doe");
+        existing.setFirstName("John");
+        existing.setLastName("Doe");
+        existing.setStatus(true);
+        TrainingMonth month = new TrainingMonth(3, 60);
+        TrainingYear year = new TrainingYear(2026, new ArrayList<>(List.of(month)));
+        existing.setYears(new ArrayList<>(List.of(year)));
 
-        TrainerWorkloadRequest request = buildRequest(5, ActionType.DELETE);
+        when(trainerSummaryRepository.searchByUsername("john.doe")).thenReturn(Optional.of(existing));
 
-        assertThrows(EntityNotFoundException.class, () -> service.process(request));
-        verify(trainerSummaryRepository, never()).save(any());
-    }
-
-    @Test
-    void handleDelete_partialAmount_reducesDuration() {
-        TrainerSummary existing = trainerWithMonth(2026, 5, 20);
-        when(trainerSummaryRepository.findByUsername(USERNAME)).thenReturn(Optional.of(existing));
-
-        TrainerWorkloadRequest request = buildRequest(8, ActionType.DELETE);
-        service.process(request);
+        workloadService.process(buildRequest(ActionType.ADD, 40, LocalDate.of(2026, 3, 15)));
 
         ArgumentCaptor<TrainerSummary> captor = ArgumentCaptor.forClass(TrainerSummary.class);
-        verify(trainerSummaryRepository).save(captor.capture());
+        verify(trainerSummaryRepository).updateByUsername(eq("john.doe"), captor.capture());
 
-        TrainingMonth updatedMonth = captor.getValue().getYearList().get(0).getMonthList().get(0);
-        assertEquals(12, updatedMonth.getDuration());
+        TrainingMonth updatedMonth = captor.getValue().getYears().get(0).getMonths().get(0);
+        assertThat(updatedMonth.getTrainingsSummaryDuration()).isEqualTo(100);
     }
 
     @Test
-    void handleDelete_moreThanExists_throwsIllegalArgument() {
-        TrainerSummary existing = trainerWithMonth(2026, 5, 5);
-        when(trainerSummaryRepository.findByUsername(USERNAME)).thenReturn(Optional.of(existing));
+    void process_add_existingTrainerNewMonth_createsMonthWithGivenDuration() {
+        TrainerSummary existing = new TrainerSummary();
+        existing.setUsername("john.doe");
+        existing.setYears(new ArrayList<>(List.of(new TrainingYear(2026, new ArrayList<>()))));
 
-        TrainerWorkloadRequest request = buildRequest(10, ActionType.DELETE); // 10 > 5
+        when(trainerSummaryRepository.searchByUsername("john.doe")).thenReturn(Optional.of(existing));
 
-        assertThrows(IllegalArgumentException.class, () -> service.process(request));
-        verify(trainerSummaryRepository, never()).save(any());
-
-        assertEquals(5, existing.getYearList().get(0).getMonthList().get(0).getDuration());
-    }
-
-    @Test
-    void handleDelete_exactAmount_removesMonth() {
-        TrainerSummary existing = trainerWithMonth(2026, 5, 10);
-        when(trainerSummaryRepository.findByUsername(USERNAME)).thenReturn(Optional.of(existing));
-
-        TrainerWorkloadRequest request = buildRequest(10, ActionType.DELETE); // exactly 10
-
-        service.process(request);
+        workloadService.process(buildRequest(ActionType.ADD, 45, LocalDate.of(2026, 5, 1)));
 
         ArgumentCaptor<TrainerSummary> captor = ArgumentCaptor.forClass(TrainerSummary.class);
-        verify(trainerSummaryRepository).save(captor.capture());
+        verify(trainerSummaryRepository).updateByUsername(eq("john.doe"), captor.capture());
 
-        TrainingYear savedYear = captor.getValue().getYearList().get(0);
-        assertThat(savedYear.getMonthList()).isEmpty();
-        assertThat(captor.getValue().getYearList()).hasSize(1);
+        TrainingYear year2026 = captor.getValue().getYears().get(0);
+        assertThat(year2026.getMonths()).extracting(TrainingMonth::getMonth).contains(5);
+        assertThat(year2026.getMonths()).filteredOn(m -> m.getMonth() == 5)
+                .extracting(TrainingMonth::getTrainingsSummaryDuration).containsExactly(45);
+    }
+
+    @Test
+    void process_delete_reducesDuration() {
+        TrainerSummary existing = new TrainerSummary();
+        existing.setUsername("john.doe");
+        TrainingMonth month = new TrainingMonth(3, 100);
+        existing.setYears(new ArrayList<>(List.of(new TrainingYear(2026, new ArrayList<>(List.of(month))))));
+
+        when(trainerSummaryRepository.searchByUsername("john.doe")).thenReturn(Optional.of(existing));
+
+        workloadService.process(buildRequest(ActionType.DELETE, 40, LocalDate.of(2026, 3, 20)));
+
+        ArgumentCaptor<TrainerSummary> captor = ArgumentCaptor.forClass(TrainerSummary.class);
+        verify(trainerSummaryRepository).updateByUsername(eq("john.doe"), captor.capture());
+        assertThat(captor.getValue().getYears().get(0).getMonths().get(0).getTrainingsSummaryDuration()).isEqualTo(60);
+    }
+
+    @Test
+    void process_delete_whenExceedsRecordedDuration_throwsIllegalArgumentException() {
+        TrainerSummary existing = new TrainerSummary();
+        existing.setUsername("john.doe");
+        TrainingMonth month = new TrainingMonth(3, 20);
+        existing.setYears(new ArrayList<>(List.of(new TrainingYear(2026, new ArrayList<>(List.of(month))))));
+
+        when(trainerSummaryRepository.searchByUsername("john.doe")).thenReturn(Optional.of(existing));
+
+        assertThatThrownBy(() -> workloadService.process(buildRequest(ActionType.DELETE, 40, LocalDate.of(2026, 3, 20))))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void process_whenTrainingDurationNotPositive_throwsIllegalArgumentExceptionAndSkipsRepository() {
+        assertThatThrownBy(() -> workloadService.process(buildRequest(ActionType.ADD, 0, LocalDate.of(2026, 3, 20))))
+                .isInstanceOf(IllegalArgumentException.class);
+
+        verifyNoInteractions(trainerSummaryRepository);
+    }
+
+    @Test
+    void getSummary_whenTrainerMissing_throwsTrainerNotFoundException() {
+        when(trainerSummaryRepository.searchByUsername("missing")).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> workloadService.getSummary("missing"))
+                .isInstanceOf(TrainerNotFoundException.class);
+    }
+
+    @Test
+    void getSummary_whenTrainerExists_returnsMappedResponse() {
+        TrainerSummary existing = new TrainerSummary();
+        existing.setUsername("john.doe");
+        existing.setFirstName("John");
+        existing.setLastName("Doe");
+        existing.setStatus(true);
+        TrainingMonth month = new TrainingMonth(3, 60);
+        existing.setYears(new ArrayList<>(List.of(new TrainingYear(2026, new ArrayList<>(List.of(month))))));
+
+        when(trainerSummaryRepository.searchByUsername("john.doe")).thenReturn(Optional.of(existing));
+
+        TrainerSummaryResponse response = workloadService.getSummary("john.doe");
+
+        assertThat(response.getUsername()).isEqualTo("john.doe");
+        assertThat(response.getYears()).hasSize(1);
+        assertThat(response.getYears().get(0).getMonths().get(0).getTrainingSummaryDuration()).isEqualTo(60);
     }
 }

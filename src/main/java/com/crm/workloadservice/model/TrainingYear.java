@@ -1,6 +1,7 @@
 package com.crm.workloadservice.model;
 
-import jakarta.persistence.*;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -9,29 +10,19 @@ import lombok.Setter;
 import java.util.ArrayList;
 import java.util.List;
 
-@Entity
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
 public class TrainingYear {
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
-
-    @Column(name = "year_number")
+    @NotNull
     private Integer year;
 
-    @ManyToOne
-    @JoinColumn(name = "trainer_id")
-    private TrainerSummary trainerSummary;
+    @Valid
+    private List<TrainingMonth> months = new ArrayList<>();
 
-    @OneToMany(mappedBy = "trainingYear", cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<TrainingMonth> monthList = new ArrayList<>();
-
-    public void addMonth(TrainingMonth month){
-        monthList.add(month);
-        month.setTrainingYear(this);
+    public void addMonth(TrainingMonth month) {
+        this.months.add(month);
     }
 }
