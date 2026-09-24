@@ -19,7 +19,7 @@ import java.util.Set;
 import java.util.UUID;
 
 @Component
-@Profile("!test")
+@Profile("!test & !standalone")
 public class WorkloadMessageListener {
 
     private static final Logger txLog = LoggerFactory.getLogger("TRANSACTION");
