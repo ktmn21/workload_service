@@ -9,6 +9,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Profile;
 import org.springframework.jms.annotation.JmsListener;
 import org.springframework.jms.core.JmsTemplate;
 import org.springframework.messaging.handler.annotation.Header;
@@ -18,6 +19,7 @@ import java.util.Set;
 import java.util.UUID;
 
 @Component
+@Profile("!test")
 public class WorkloadMessageListener {
 
     private static final Logger txLog = LoggerFactory.getLogger("TRANSACTION");

@@ -16,9 +16,11 @@ import org.springframework.jms.support.converter.MessageConverter;
 import org.springframework.jms.support.converter.MessageType;
 
 import jakarta.jms.ConnectionFactory;
+import org.springframework.context.annotation.Profile;
 
 @Configuration
 @EnableJms
+@Profile("!test")
 public class JmsConfig {
 
     @Value("${spring.activemq.broker-url}")
