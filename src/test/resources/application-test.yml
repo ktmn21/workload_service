@@ -1,0 +1,27 @@
+de:
+  flapdoodle:
+    mongodb:
+      embedded:
+        version: 7.0.0
+
+spring:
+  data:
+    mongodb:
+      database: workloaddb-test
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.jms.JmsAutoConfiguration
+      - org.springframework.boot.autoconfigure.jms.activemq.ActiveMQAutoConfiguration
+
+jwt:
+  secret: 404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970
+
+workload:
+  queue:
+    name: workload.queue
+    dlq-name: workload.dlq
+    max-redeliveries: 3
+
+logging:
+  level:
+    root: WARN
