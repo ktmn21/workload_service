@@ -1,0 +1,16 @@
+
+spring:
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.jms.JmsAutoConfiguration
+      - org.springframework.boot.autoconfigure.jms.activemq.ActiveMQAutoConfiguration
+      - de.flapdoodle.embed.mongo.spring.autoconfigure.EmbeddedMongoAutoConfiguration
+
+  data:
+    mongodb:
+      uri: mongodb://workload-mongo:27017/workloaddb
+      auto-index-creation: true
+
+logging:
+  file:
+    name: /app/logs/application.log
